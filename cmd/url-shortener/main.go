@@ -4,11 +4,11 @@ import (
 	"net/http"
 	"os"
 	"url-shortener/internal/config"
+	"url-shortener/internal/http-server/handlers/url/save"
 	mwlogger "url-shortener/internal/http-server/middlware/logger"
-	"url-shortener/internal/http-server/middlware/logger/handlers/url/save"
 	"url-shortener/internal/lib/logger/handlers/slogpretty"
 	"url-shortener/internal/lib/logger/sl"
-	"url-shortener/internal/storage/sqllite"
+	sqlite "url-shortener/internal/storage/sqlite"
 
 	"log/slog"
 
@@ -32,7 +32,7 @@ func main() {
 	log.Debug("debug message are enabled")
 
 	// TODO: init storage: psql
-	storage, err := sqllite.New(config.StoragePath)
+	storage, err := sqlite.New(config.StoragePath)
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
