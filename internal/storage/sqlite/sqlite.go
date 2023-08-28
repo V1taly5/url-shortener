@@ -1,20 +1,21 @@
-package sqllite
+package sqlite
 
 import (
 	"database/sql"
 	"errors"
 	"fmt"
+
 	"url-shortener/internal/storage"
 
 	"github.com/mattn/go-sqlite3"
 )
 
 type Storage struct {
-	bd *sql.DB
+	db *sql.DB
 }
 
 func New(storagePath string) (*Storage, error) {
-	const op = "storage/sqllite/New"
+	const op = "storage.sqlite.New"
 
 	db, err := sql.Open("sqlite3", storagePath)
 	if err != nil {
@@ -28,7 +29,6 @@ func New(storagePath string) (*Storage, error) {
 		url TEXT NOT NULL);
 	CREATE INDEX IF NOT EXISTS idx_alias ON url(alias);
 	`)
-
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
@@ -38,20 +38,19 @@ func New(storagePath string) (*Storage, error) {
 		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 
-	return &Storage{db}, nil
+	return &Storage{db: db}, nil
 }
 
 func (s *Storage) SaveURL(urlToSave string, alias string) (int64, error) {
-	const op = "storage/sqlite/SaveURL"
+	const op = "storage.sqlite.SaveURL"
 
-	stmt, err := s.bd.Prepare("INSERT INTO url(url, alias) VALUES(?, ?)")
+	stmt, err := s.db.Prepare("INSERT INTO url(url, alias) VALUES(?, ?)")
 	if err != nil {
 		return 0, fmt.Errorf("%s: %w", op, err)
 	}
 
 	res, err := stmt.Exec(urlToSave, alias)
 	if err != nil {
-
 		if sqliteErr, ok := err.(sqlite3.Error); ok && sqliteErr.ExtendedCode == sqlite3.ErrConstraintUnique {
 			return 0, fmt.Errorf("%s: %w", op, storage.ErrURLExists)
 		}
@@ -65,26 +64,29 @@ func (s *Storage) SaveURL(urlToSave string, alias string) (int64, error) {
 	}
 
 	return id, nil
-
 }
 
 func (s *Storage) GetURL(alias string) (string, error) {
-	const op = "storage/sqlite/GetURL"
+	const op = "storage.sqlite.GetURL"
 
-	stmt, err := s.bd.Prepare("SELECT url FROM url WHERE alias = ?")
+	stmt, err := s.db.Prepare("SELECT url FROM url WHERE alias = ?")
 	if err != nil {
-		return "", fmt.Errorf("%s: prepare statement %w", op, err)
+		return "", fmt.Errorf("%s: prepare statement: %w", op, err)
 	}
 
 	var resURL string
+
 	err = stmt.QueryRow(alias).Scan(&resURL)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", storage.ErrURLNotFound
-	}
 	if err != nil {
-		return "", fmt.Errorf("%s: execute statement %w", op, err)
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", storage.ErrURLNotFound
+		}
+
+		return "", fmt.Errorf("%s: execute statement: %w", op, err)
 	}
+
 	return resURL, nil
 }
 
+// TODO: implement method
 // func (s *Storage) DeleteURL(alias string) error
