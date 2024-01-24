@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 	"url-shortener/internal/config"
+	"url-shortener/internal/http-server/handlers/redirect"
 	"url-shortener/internal/http-server/handlers/url/save"
 	mwlogger "url-shortener/internal/http-server/middlware/logger"
 	"url-shortener/internal/lib/logger/handlers/slogpretty"
@@ -48,7 +49,15 @@ func main() {
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	router.Post("/url", save.New(log, storage))
+	router.Route("/url", func(r chi.Router) {
+		r.Use(middleware.BasicAuth("url-shortener", map[string]string{
+			config.HTTPServer.User: config.HTTPServer.Password,
+		}))
+		r.Post("/", save.New(log, storage))
+		// TODO: add GET /url/{id}
+	})
+
+	router.Get("/{alias}", redirect.New(log, storage))
 
 	log.Info("starting server", slog.String("address", config.Address))
 
@@ -64,7 +73,7 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil {
 		log.Error("failed to run server")
 	}
-	log.Error("se stopped")
+	log.Error("server stopped")
 }
 
 func setupLogger(env string) *slog.Logger {
